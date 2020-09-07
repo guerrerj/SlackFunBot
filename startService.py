@@ -11,10 +11,12 @@ import logging
 import ScreenShot
 from ScreenShot import getScreenShot
 import sys
+import traceback
+#NB Service must be started as a specific user or else it won't start
 
 # Set logging configuration 
-logging.basicConfig(level=logging.DEBUG)
-
+logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+        
 class WindowsService(win32serviceutil.ServiceFramework):
     """ This is a windows service class which will update slack with joke of the day
         and with a word of the day. 
@@ -23,35 +25,48 @@ class WindowsService(win32serviceutil.ServiceFramework):
     _svc_display_name_ = "Daily Knowledge Bot"
     description = "Places a daily joke and word of the day from the internet to slack"
     isRunning = False
+    scheduler = sched.scheduler(time.time, time.sleep)
     
     @classmethod 
     def parseCommandLine(cls):
-        """ Parses the class in the command line """       
-     
+        """ Parses the class in the command line """   
         win32serviceutil.HandleCommandLine(cls)
         
     def __init__(self, args):
         """ Class constructor - initializes the windows service """
-        logging.debug("init")
-        super().__init__(args)
+        logging.debug("In Constructor\n")
+        win32serviceutil.ServiceFramework.__init__(self,args)
         self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        socket.setdefaulttimeout(60)
-        self.scheduler = sched.scheduler(time.time, time.sleep)      
+        socket.setdefaulttimeout(60)  
         
     def SvcStop(self):
         """ Is a handler for when the service stops """
+        logging.debug("Stopping service")
+        print("Service is stopping")
         self.stop() 
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.hWaitStop) 
         
     def SvcDoRun(self):
         """ Is a handler for when a service is asked to start """
+        logging.debug("Starting service")
         self.start() 
         #self.ReportServiceStatus(win32service.SERVICE_RUNNING)
         servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE, 
                               servicemanager.PYS_SERVICE_STARTED, 
-                              (self._svc_name_, ''))        
-        self.periodic(self.scheduler, 30, self.runAction) 
+                              (self._svc_name_, ''))
+        try: # try main
+            logging.debug("Starting scheduler")
+            #print("starting scheduler")   
+            minutes = 1440           
+            self.periodic(minutes, self.runAction) 
+            #rint("starting scheduler")
+            self.scheduler.run()
+        except Exception as ex:
+            print(ex)
+            servicemanager.LogErrorMsg(traceback.format_exc()) # if error print it to event log
+            #os._exit(-1)#return some value other than 0 to os so that service knows to restart     
+    
     
     def start(self):
         """ Set any additional starting conditions """
@@ -61,11 +76,15 @@ class WindowsService(win32serviceutil.ServiceFramework):
         """ Set any additional stop conditions """ 
         self.isRunning = False 
     
-    def periodic(self, scheduler, interval, runAction):
+    def periodic(self, interval, runAction):
         """ Schedules the screenshots to be taken at an interval """                
         if self.isRunning:
-            scheduler.enter(interval, 1, self.periodic, 
-                            (self, scheduler, interval, runAction ))
+            logging.debug("Running main script")
+            print("in periodic\n")
+            
+            print("entering schedule")
+            self.scheduler.enter(interval, 1, self.periodic, 
+                            (interval, runAction ))
             runAction()
         
     def runAction(self):

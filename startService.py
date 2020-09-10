@@ -56,16 +56,17 @@ class WindowsService(win32serviceutil.ServiceFramework):
                               servicemanager.PYS_SERVICE_STARTED, 
                               (self._svc_name_, ''))
         try: # try main
-            logging.debug("Starting scheduler")
-            #print("starting scheduler")   
-            minutes = 1440           
-            self.periodic(minutes, self.runAction) 
-            #rint("starting scheduler")
-            self.scheduler.run()
+            if not self.isRunning:
+                logging.debug("Starting scheduler")
+                #print("starting scheduler")   
+                minutes = 1440           
+                self.periodic(minutes*60, self.runAction) 
+                #rint("starting scheduler")
+                self.scheduler.run()
         except Exception as ex:
             print(ex)
             servicemanager.LogErrorMsg(traceback.format_exc()) # if error print it to event log
-            os._exit(-1)#return some value other than 0 to os so that service knows to restart     
+            os._exit(-1) #return some value other than 0 to os so that service knows to restart     
     
     
     def start(self):
@@ -89,62 +90,61 @@ class WindowsService(win32serviceutil.ServiceFramework):
         
     def runAction(self):
         """ Contains the main logic of the script """
-        if True:
-            timeOut = 600 # 10 minutes till timeout 
-            endTime = time.time() + timeOut   
-            try:
-                slackToken = os.environ["SLACK_API_TOKEN"]
-                channelId = 'CGART6MC3'
-                client = WebClient(token=slackToken)                             
-                responseStatus = False
-                screenPath1,_, _ = getScreenShot(url="https://www.ajokeaday.com/", 
-                                                fileName='screenshot1.png', 
-                                                crop=True, 
-                                                cropReplace=False, 
-                                                thumbnail=False, 
-                                                thumbnailReplace=False, 
-                                                thumbnailWidth=200, 
-                                                thumbnailHeight=150, closeButton=True)
+        timeOut = 600 # 10 minutes till timeout 
+        endTime = time.time() + timeOut   
+        try:
+            slackToken = os.environ["SLACK_API_TOKEN"]
+            channelId = 'CGART6MC3'
+            client = WebClient(token=slackToken)                             
+            responseStatus = False
+            screenPath1,_, _ = getScreenShot(url="https://www.ajokeaday.com/", 
+                                            fileName='screenshot1.png', 
+                                            crop=True, 
+                                            cropReplace=False, 
+                                            thumbnail=False, 
+                                            thumbnailReplace=False, 
+                                            thumbnailWidth=200, 
+                                            thumbnailHeight=150, closeButton=True)
+            
+            screenPath2,_, _ = getScreenShot(url="https://www.merriam-webster.com/word-of-the-day", 
+                                            fileName='screenshot2.png', 
+                                            crop=True, 
+                                            cropReplace=False, 
+                                            thumbnail=False, 
+                                            thumbnailReplace=False, 
+                                            thumbnailWidth=200, 
+                                            thumbnailHeight=150)
+            
+            while (not responseStatus and time.time() < endTime):
+                screenPath1 = screenPath1.replace('\\', '/')
+                screenPath2 = screenPath2.replace('\\', '/')                 
                 
-                screenPath2,_, _ = getScreenShot(url="https://www.merriam-webster.com/word-of-the-day", 
-                                                fileName='screenshot2.png', 
-                                                crop=True, 
-                                                cropReplace=False, 
-                                                thumbnail=False, 
-                                                thumbnailReplace=False, 
-                                                thumbnailWidth=200, 
-                                                thumbnailHeight=150)
                 
-                while (not responseStatus and time.time() < endTime):
-                    screenPath1 = screenPath1.replace('\\', '/')
-                    screenPath2 = screenPath2.replace('\\', '/')                 
+                response = client.chat_postMessage(
+                    channel=channelId, icon_emoji=":exploding_head:", 
+                        link_names=True, username=self._svc_display_name_,
+                        blocks=[
+                                {
+                                    "type": "section",
+                                    "text": {
+                                        "type": "mrkdwn",
+                                        "text": "@here Time to laugh and build your vocabulary!\n"
+                                    }
+                                }                                   
+                            ])
+                response2 = client.files_upload(channels=channelId, file=screenPath1, title="Joke of the day")
+                response3 = client.files_upload(channels=channelId, file=screenPath2, title="Word of the day")
+                if response["ok"] and response2["ok"] and response3["ok"]:
+                    responseStatus = True
+                else:
+                    logging.warning(f"Error posting to channel: {response['error']}")
+                time.sleep(5)
+                
+            if time.time() >= endTime:
+                logging.warning("Timeout when posting to channel!")
                     
-                   
-                    response = client.chat_postMessage(
-                        channel=channelId, icon_emoji=":exploding_head:", 
-                            link_names=True, username=self._svc_display_name_,
-                            blocks=[
-                                    {
-                                        "type": "section",
-                                        "text": {
-                                            "type": "mrkdwn",
-                                            "text": "@here Time to laugh and build your vocabulary!\n"
-                                        }
-                                    }                                   
-                                ])
-                    response2 = client.files_upload(channels=channelId, file=screenPath1, title="Joke of the day")
-                    response3 = client.files_upload(channels=channelId, file=screenPath2, title="Word of the day")
-                    if response["ok"] and response2["ok"] and response3["ok"]:
-                        responseStatus = True
-                    else:
-                        logging.warning(f"Error posting to channel: {response['error']}")
-                    time.sleep(5)
-                    
-                if time.time() >= endTime:
-                    logging.warning("Timeout when posting to channel!")
-                        
-            except Exception as ex:
-                logging.error(f"Error executing running service: {ex}")      
+        except Exception as ex:
+            logging.error(f"Error executing running service: {ex}")      
                          
                 
                                         

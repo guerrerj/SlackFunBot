@@ -37,7 +37,7 @@ class WindowsService(win32serviceutil.ServiceFramework):
         logging.debug("In Constructor\n")
         win32serviceutil.ServiceFramework.__init__(self,args)
         self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        socket.setdefaulttimeout(60)  
+        socket.setdefaulttimeout(200)  
         
     def SvcStop(self):
         """ Is a handler for when the service stops """
@@ -65,7 +65,7 @@ class WindowsService(win32serviceutil.ServiceFramework):
         except Exception as ex:
             print(ex)
             servicemanager.LogErrorMsg(traceback.format_exc()) # if error print it to event log
-            #os._exit(-1)#return some value other than 0 to os so that service knows to restart     
+            os._exit(-1)#return some value other than 0 to os so that service knows to restart     
     
     
     def start(self):
@@ -145,7 +145,7 @@ class WindowsService(win32serviceutil.ServiceFramework):
                         
             except Exception as ex:
                 logging.error(f"Error executing running service: {ex}")      
-                self.stop()          
+                         
                 
                                         
     

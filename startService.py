@@ -55,18 +55,17 @@ class WindowsService(win32serviceutil.ServiceFramework):
         servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE, 
                               servicemanager.PYS_SERVICE_STARTED, 
                               (self._svc_name_, ''))
-        try: # try main
-            if not self.isRunning:
-                logging.debug("Starting scheduler")
-                #print("starting scheduler")   
-                minutes = 1440           
-                self.periodic(minutes*60, self.runAction) 
-                #rint("starting scheduler")
-                self.scheduler.run()
+        try: # try main            
+            logging.debug("Starting scheduler")
+            #print("starting scheduler")   
+            minutes = 1440           
+            self.periodic(minutes*60, self.runAction) 
+            #rint("starting scheduler")
+            self.scheduler.run()
         except Exception as ex:
             print(ex)
             servicemanager.LogErrorMsg(traceback.format_exc()) # if error print it to event log
-            os._exit(-1) #return some value other than 0 to os so that service knows to restart     
+            #os._exit(-1) #return some value other than 0 to os so that service knows to restart     
     
     
     def start(self):
